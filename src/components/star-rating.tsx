@@ -13,7 +13,9 @@ export const StarRating = memo(function StarRating({
   return (
     <span className={className}>
       {"★".repeat(rounded)}
-      <span className="text-muted-foreground/40">{"★".repeat(max - rounded)}</span>
+      <span className="text-muted-foreground/40">
+        {"★".repeat(max - rounded)}
+      </span>
     </span>
   );
 });

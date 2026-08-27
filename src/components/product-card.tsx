@@ -13,7 +13,9 @@ export type ProductCardProduct = {
   product_images?: { url: string; sort_order: number }[] | null;
 };
 
-function getFirstImage(images: ProductCardProduct["product_images"]): string | undefined {
+function getFirstImage(
+  images: ProductCardProduct["product_images"],
+): string | undefined {
   if (!images || images.length === 0) return undefined;
   // Avoid sort on every render — find min sort_order in a single pass
   let best = images[0];
@@ -30,7 +32,9 @@ export const ProductCard = memo(function ProductCard({
 }) {
   const { toggle } = useWishlist();
   const img = getFirstImage(product.product_images);
-  const compare = product.compare_at_price ? Number(product.compare_at_price) : null;
+  const compare = product.compare_at_price
+    ? Number(product.compare_at_price)
+    : null;
   const showSale = compare && compare > Number(product.price);
 
   return (

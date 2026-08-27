@@ -5,7 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { useSiteSettings, getBrandName } from "@/lib/site-settings";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 const defaultNav = [
   { to: "/shop", label: "Shop" },
@@ -19,7 +26,9 @@ export function SiteHeader() {
   const { count } = useCart();
   const { data: settings } = useSiteSettings();
   const brand = getBrandName(settings);
-  const nav = (settings?.navigation as unknown as { to: string; label: string }[]) ?? defaultNav;
+  const nav =
+    (settings?.navigation as unknown as { to: string; label: string }[]) ??
+    defaultNav;
   const [open, setOpen] = useState(false);
 
   return (
@@ -28,7 +37,12 @@ export function SiteHeader() {
         <div className="flex items-center gap-8">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="Open menu"
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -39,12 +53,21 @@ export function SiteHeader() {
               </SheetHeader>
               <nav className="mt-8 flex flex-col gap-4 text-lg font-display">
                 {nav.map((n) => (
-                  <Link key={n.to} to={n.to} onClick={() => setOpen(false)} className="hover:text-accent">
+                  <Link
+                    key={n.to}
+                    to={n.to}
+                    onClick={() => setOpen(false)}
+                    className="hover:text-accent"
+                  >
                     {n.label}
                   </Link>
                 ))}
                 {isAdmin && (
-                  <Link to="/admin" onClick={() => setOpen(false)} className="hover:text-accent">
+                  <Link
+                    to="/admin"
+                    onClick={() => setOpen(false)}
+                    className="hover:text-accent"
+                  >
                     Admin
                   </Link>
                 )}
@@ -83,7 +106,13 @@ export function SiteHeader() {
               <User className="h-5 w-5" />
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" className="relative" aria-label="Cart">
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="relative"
+            aria-label="Cart"
+          >
             <Link to="/cart">
               <ShoppingBag className="h-5 w-5" />
               {count > 0 && (

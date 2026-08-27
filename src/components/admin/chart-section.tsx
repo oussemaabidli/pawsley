@@ -1,7 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/format";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 export default function ChartSection() {
@@ -30,7 +34,10 @@ export default function ChartSection() {
       });
       return Array.from(byDay.entries()).map(([date, revenue]) => ({
         date,
-        label: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        label: new Date(date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         revenue: +revenue.toFixed(2),
       }));
     },
@@ -52,15 +59,45 @@ export default function ChartSection() {
         <AreaChart data={trend.data ?? []}>
           <defs>
             <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+              <stop
+                offset="0%"
+                stopColor="hsl(var(--primary))"
+                stopOpacity={0.4}
+              />
+              <stop
+                offset="100%"
+                stopColor="hsl(var(--primary))"
+                stopOpacity={0}
+              />
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
-          <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} fontSize={11} width={48} />
-          <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatMoney(Number(v))} />} />
-          <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#rev)" />
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            fontSize={11}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => `$${v}`}
+            fontSize={11}
+            width={48}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent formatter={(v) => formatMoney(Number(v))} />
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="revenue"
+            stroke="hsl(var(--primary))"
+            strokeWidth={2}
+            fill="url(#rev)"
+          />
         </AreaChart>
       </ChartContainer>
     </>

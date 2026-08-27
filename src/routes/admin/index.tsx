@@ -13,18 +13,61 @@ function AdminOverview() {
     queryKey: ["admin_stats"],
     queryFn: async () => {
       const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const [ordersToday, ordersMonth, revenueMonth, pending, low, recent, customers] = await Promise.all([
-        supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", startOfDay),
-        supabase.from("orders").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth),
-        supabase.from("orders").select("total").gte("created_at", startOfMonth).neq("status", "cancelled").neq("status", "rejected"),
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("products").select("id,name,stock").lt("stock", 10).eq("archived", false).order("stock").limit(5),
-        supabase.from("orders").select("id,order_number,total,status,created_at,email").order("created_at", { ascending: false }).limit(5),
+      const startOfDay = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      ).toISOString();
+      const startOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        1,
+      ).toISOString();
+      const [
+        ordersToday,
+        ordersMonth,
+        revenueMonth,
+        pending,
+        low,
+        recent,
+        customers,
+      ] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", startOfDay),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", startOfMonth),
+        supabase
+          .from("orders")
+          .select("total")
+          .gte("created_at", startOfMonth)
+          .neq("status", "cancelled")
+          .neq("status", "rejected"),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        supabase
+          .from("products")
+          .select("id,name,stock")
+          .lt("stock", 10)
+          .eq("archived", false)
+          .order("stock")
+          .limit(5),
+        supabase
+          .from("orders")
+          .select("id,order_number,total,status,created_at,email")
+          .order("created_at", { ascending: false })
+          .limit(5),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
       ]);
-      const rev = (revenueMonth.data ?? []).reduce((s, r) => s + Number(r.total), 0);
+      const rev = (revenueMonth.data ?? []).reduce(
+        (s, r) => s + Number(r.total),
+        0,
+      );
       return {
         ordersToday: ordersToday.count ?? 0,
         ordersMonth: ordersMonth.count ?? 0,
@@ -39,22 +82,30 @@ function AdminOverview() {
 
   const cards = useMemo(
     () => [
-      { label: "Revenue this month", value: formatMoney(stats.data?.revenueMonth ?? 0) },
+      {
+        label: "Revenue this month",
+        value: formatMoney(stats.data?.revenueMonth ?? 0),
+      },
       { label: "Orders today", value: stats.data?.ordersToday ?? 0 },
       { label: "Orders this month", value: stats.data?.ordersMonth ?? 0 },
       { label: "Pending orders", value: stats.data?.pending ?? 0 },
       { label: "Customers", value: stats.data?.customers ?? 0 },
     ],
-    [stats.data]
+    [stats.data],
   );
 
   return (
-    <div className="p-8">
-      <h1 className="font-display text-3xl">Overview</h1>
-      <div className="mt-6 grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+    <div className="p-4 sm:p-8">
+      <h1 className="font-display text-2xl sm:text-3xl">Overview</h1>
+      <div className="mt-4 sm:mt-6 grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         {cards.map((c) => (
-          <div key={c.label} className="rounded border border-border bg-card p-5">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">{c.label}</div>
+          <div
+            key={c.label}
+            className="rounded border border-border bg-card p-5"
+          >
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">
+              {c.label}
+            </div>
             <div className="mt-2 font-display text-2xl">{c.value}</div>
           </div>
         ))}
@@ -66,7 +117,9 @@ function AdminOverview() {
             <h2 className="font-display text-xl">Revenue — last 30 days</h2>
           </div>
           <Suspense
-            fallback={<div className="mt-4 h-64 w-full animate-pulse rounded bg-muted" />}
+            fallback={
+              <div className="mt-4 h-64 w-full animate-pulse rounded bg-muted" />
+            }
           >
             <ChartSection />
           </Suspense>
@@ -75,7 +128,9 @@ function AdminOverview() {
         <section className="rounded border border-border bg-card p-6">
           <h2 className="font-display text-xl">Top products</h2>
           <Suspense
-            fallback={<div className="mt-4 h-64 w-full animate-pulse rounded bg-muted" />}
+            fallback={
+              <div className="mt-4 h-64 w-full animate-pulse rounded bg-muted" />
+            }
           >
             <TopProductsChart />
           </Suspense>
@@ -90,15 +145,21 @@ function AdminOverview() {
               <li key={o.id} className="flex items-center justify-between py-2">
                 <div>
                   <div className="font-medium">{o.order_number}</div>
-                  <div className="text-xs text-muted-foreground">{o.email} · {formatDate(o.created_at)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {o.email} · {formatDate(o.created_at)}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div>{formatMoney(o.total)}</div>
-                  <div className="text-xs capitalize text-muted-foreground">{o.status}</div>
+                  <div className="text-xs capitalize text-muted-foreground">
+                    {o.status}
+                  </div>
                 </div>
               </li>
             ))}
-            {stats.data?.recent.length === 0 && <li className="py-4 text-muted-foreground">No orders yet.</li>}
+            {stats.data?.recent.length === 0 && (
+              <li className="py-4 text-muted-foreground">No orders yet.</li>
+            )}
           </ul>
         </section>
         <section className="rounded border border-border bg-card p-6">
@@ -110,7 +171,9 @@ function AdminOverview() {
                 <span className="text-muted-foreground">{p.stock} left</span>
               </li>
             ))}
-            {stats.data?.low.length === 0 && <li className="py-4 text-muted-foreground">All stocked.</li>}
+            {stats.data?.low.length === 0 && (
+              <li className="py-4 text-muted-foreground">All stocked.</li>
+            )}
           </ul>
         </section>
       </div>
@@ -127,7 +190,10 @@ function TopProductsChart() {
         .select("product_id,name,quantity,price,order:orders!inner(status)")
         .in("order.status", ["accepted", "preparing", "shipped", "delivered"])
         .limit(1000);
-      const map = new Map<string, { name: string; qty: number; revenue: number }>();
+      const map = new Map<
+        string,
+        { name: string; qty: number; revenue: number }
+      >();
       (data ?? []).forEach((r) => {
         const key = (r.product_id ?? r.name) as string;
         const cur = map.get(key) ?? { name: r.name, qty: 0, revenue: 0 };
@@ -135,7 +201,9 @@ function TopProductsChart() {
         cur.revenue += Number(r.price) * r.quantity;
         map.set(key, cur);
       });
-      return Array.from(map.values()).sort((a, b) => b.qty - a.qty).slice(0, 6);
+      return Array.from(map.values())
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 6);
     },
   });
 
@@ -148,7 +216,9 @@ function TopProductsChart() {
       {top.data.map((item, i) => (
         <div key={i} className="flex items-center justify-between text-sm">
           <span className="truncate">{item.name}</span>
-          <span className="ml-4 shrink-0 text-muted-foreground">{item.qty} sold</span>
+          <span className="ml-4 shrink-0 text-muted-foreground">
+            {item.qty} sold
+          </span>
         </div>
       ))}
     </div>

@@ -1,4 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useChildMatches,
+} from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/format";
@@ -8,9 +13,18 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useDebounce } from "@/hooks/use-debounce";
 
-export const Route = createFileRoute("/admin/products")({ component: AdminProducts });
+export const Route = createFileRoute("/admin/products")({
+  component: AdminProductsLayout,
+});
 
 const PAGE_SIZE = 25;
+
+// Show child route (new/edit) when active, otherwise show the products list
+function AdminProductsLayout() {
+  const childMatches = useChildMatches();
+  if (childMatches.length > 0) return <Outlet />;
+  return <AdminProducts />;
+}
 
 function AdminProducts() {
   const qc = useQueryClient();
@@ -24,7 +38,9 @@ function AdminProducts() {
       const from = (page - 1) * PAGE_SIZE;
       const { data, error, count } = await supabase
         .from("products")
-        .select("id,name,slug,price,stock,visible,archived,featured", { count: "exact" })
+        .select("id,name,slug,price,stock,visible,archived,featured", {
+          count: "exact",
+        })
         .order("created_at", { ascending: false })
         .range(from, from + PAGE_SIZE - 1);
       if (error) throw error;
@@ -35,7 +51,9 @@ function AdminProducts() {
   const filtered = useMemo(() => {
     if (!debouncedQ.trim()) return data?.items ?? [];
     const lower = debouncedQ.toLowerCase();
-    return (data?.items ?? []).filter((p) => p.name.toLowerCase().includes(lower));
+    return (data?.items ?? []).filter((p) =>
+      p.name.toLowerCase().includes(lower),
+    );
   }, [data?.items, debouncedQ]);
 
   const totalPages = Math.max(1, Math.ceil((data?.count ?? 0) / PAGE_SIZE));
@@ -53,75 +71,151 @@ function AdminProducts() {
   });
   const toggleArchive = useMutation({
     mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
-      const { error } = await supabase.from("products").update({ archived }).eq("id", id);
+      const { error } = await supabase
+        .from("products")
+        .update({ archived })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin_products"] }),
   });
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-display text-3xl">Products</h1>
-        <Button asChild><Link to="/admin/products/new">New product</Link></Button>
+    <div className="p-4 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-2xl sm:text-3xl">Products</h1>
+        <Button asChild>
+          <Link to="/admin/products/new">New product</Link>
+        </Button>
       </div>
-      <div className="mt-6 flex items-center gap-4">
-        <Input className="max-w-sm" placeholder="Search…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        <span className="text-sm text-muted-foreground">{data?.count ?? 0} total</span>
+      <div className="mt-4 sm:mt-6 flex flex-wrap items-center gap-4">
+        <Input
+          className="w-full max-w-sm"
+          placeholder="Search…"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+        />
+        <span className="text-sm text-muted-foreground">
+          {data?.count ?? 0} total
+        </span>
       </div>
-      <div className="mt-4 overflow-hidden rounded border border-border">
-        <table className="w-full text-sm">
+      <div className="mt-4 overflow-x-auto rounded border border-border">
+        <table className="min-w-[600px] w-full text-sm">
           <thead className="bg-secondary/60 text-left text-xs uppercase tracking-widest">
             <tr>
               <th className="p-3">Name</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
-              <th className="p-3">Status</th>
+              <th className="p-3 hidden sm:table-cell">Status</th>
               <th className="p-3 w-40"></th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-t border-border">
-                  <td colSpan={5} className="p-3"><div className="h-4 animate-pulse rounded bg-muted" /></td>
-                </tr>
-              ))
-            ) : (
-              filtered.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="p-3">
-                    <Link to="/admin/products/$id" params={{ id: p.id }} className="font-medium hover:underline">{p.name}</Link>
-                    <div className="text-xs text-muted-foreground">/{p.slug}</div>
-                  </td>
-                  <td className="p-3">{formatMoney(p.price)}</td>
-                  <td className="p-3">{p.stock}</td>
-                  <td className="p-3 text-xs capitalize">
-                    {p.archived ? "archived" : p.visible ? "visible" : "hidden"}
-                    {p.featured ? " · featured" : ""}
-                  </td>
-                  <td className="p-3 text-right">
-                    <Button size="sm" variant="ghost" onClick={() => toggleArchive.mutate({ id: p.id, archived: !p.archived })}>
-                      {p.archived ? "Restore" : "Archive"}
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => {
-                      if (confirm(`Delete "${p.name}"? This cannot be undone.`)) del.mutate(p.id);
-                    }}>Delete</Button>
-                  </td>
-                </tr>
-              ))
-            )}
+            {isLoading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td colSpan={5} className="p-3">
+                      <div className="h-4 animate-pulse rounded bg-muted" />
+                    </td>
+                  </tr>
+                ))
+              : filtered.map((p) => (
+                  <tr key={p.id} className="border-t border-border">
+                    <td className="p-3">
+                      <Link
+                        to="/admin/products/$id"
+                        params={{ id: p.id }}
+                        className="font-medium hover:underline"
+                      >
+                        {p.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        /{p.slug}
+                      </div>
+                    </td>
+                    <td className="p-3">{formatMoney(p.price)}</td>
+                    <td className="p-3">{p.stock}</td>
+                    <td className="p-3 text-xs capitalize hidden sm:table-cell">
+                      {p.archived
+                        ? "archived"
+                        : p.visible
+                          ? "visible"
+                          : "hidden"}
+                      {p.featured ? " · featured" : ""}
+                    </td>
+                    <td className="p-3 text-right">
+                      <Button asChild size="sm" variant="ghost">
+                        <Link to="/admin/products/$id" params={{ id: p.id }}>
+                          Edit
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          toggleArchive.mutate({
+                            id: p.id,
+                            archived: !p.archived,
+                          })
+                        }
+                      >
+                        {p.archived ? "Restore" : "Archive"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Delete "${p.name}"? This cannot be undone.`,
+                            )
+                          )
+                            del.mutate(p.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
             {filtered.length === 0 && !isLoading && (
-              <tr><td colSpan={5} className="p-10 text-center text-muted-foreground">No products.</td></tr>
+              <tr>
+                <td
+                  colSpan={5}
+                  className="p-10 text-center text-muted-foreground"
+                >
+                  No products.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
-          <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
         </div>
       )}
     </div>

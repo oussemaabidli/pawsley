@@ -62,8 +62,17 @@ export function ImageUpload({
 
       {value ? (
         /* Preview */
-        <div className={cn("relative overflow-hidden rounded border border-border bg-secondary", aspect)}>
-          <img src={value} alt="Preview" className="h-full w-full object-cover" />
+        <div
+          className={cn(
+            "relative overflow-hidden rounded border border-border bg-secondary",
+            aspect,
+          )}
+        >
+          <img
+            src={value}
+            alt="Preview"
+            className="h-full w-full object-cover"
+          />
           <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition-opacity hover:opacity-100">
             <Button
               type="button"
@@ -72,7 +81,11 @@ export function ImageUpload({
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
             >
-              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Replace"}
+              {uploading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                "Replace"
+              )}
             </Button>
             <Button
               type="button"

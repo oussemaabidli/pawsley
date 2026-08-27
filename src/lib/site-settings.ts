@@ -6,7 +6,9 @@ export type SiteSettings = Record<string, Record<string, unknown>>;
 export const siteSettingsQuery = {
   queryKey: ["site_settings"],
   queryFn: async (): Promise<SiteSettings> => {
-    const { data, error } = await supabase.from("site_settings").select("key,value");
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("key,value");
     if (error) throw error;
     const out: SiteSettings = {};
     (data ?? []).forEach((r) => {

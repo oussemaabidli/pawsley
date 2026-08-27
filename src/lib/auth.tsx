@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,7 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "USER_UPDATED"
+      ) {
         router.invalidate();
         if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
       }
@@ -70,7 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ session, user: session?.user ?? null, isAdmin, loading, signOut }}
+      value={{
+        session,
+        user: session?.user ?? null,
+        isAdmin,
+        loading,
+        signOut,
+      }}
     >
       {children}
     </Ctx.Provider>
