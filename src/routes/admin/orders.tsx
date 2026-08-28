@@ -11,8 +11,11 @@ import {
   MapPin,
   Truck,
   FileText,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export const Route = createFileRoute("/admin/orders")({
   component: AdminOrders,
@@ -55,6 +58,132 @@ type Order = {
   created_at: string;
   order_items: OrderItem[];
 };
+
+// ─── PDF generator ────────────────────────────────────────────────────────────
+function downloadOrderPDF(order: Order) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const addr = order.shipping_address;
+  const margin = 14;
+  let y = margin;
+
+  // Header bar
+  doc.setFillColor(20, 20, 20);
+  doc.rect(0, 0, 210, 28, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("INVOICE", margin, 18);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(order.order_number, 210 - margin, 18, { align: "right" });
+  y = 38;
+
+  // Reset text color
+  doc.setTextColor(30, 30, 30);
+
+  // Date + status row
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Date: ${formatDate(order.created_at)}`, margin, y);
+  doc.text(`Status: ${order.status.toUpperCase()}`, 210 - margin, y, { align: "right" });
+  y += 8;
+
+  // Divider
+  doc.setDrawColor(220, 220, 220);
+  doc.line(margin, y, 210 - margin, y);
+  y += 6;
+
+  // Customer + shipping in two columns
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("CUSTOMER", margin, y);
+  doc.text("SHIPPING ADDRESS", 115, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+
+  const customerLines = [
+    addr?.full_name ?? "",
+    order.email,
+    addr?.phone ?? "",
+  ].filter(Boolean);
+  const addressLines = [
+    addr?.line1 ?? "",
+    addr?.line2 ?? "",
+    [addr?.city, addr?.state, addr?.postal_code].filter(Boolean).join(", "),
+    addr?.country ?? "",
+  ].filter(Boolean);
+
+  const maxLines = Math.max(customerLines.length, addressLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (customerLines[i]) doc.text(customerLines[i], margin, y + i * 5);
+    if (addressLines[i]) doc.text(addressLines[i], 115, y + i * 5);
+  }
+  y += maxLines * 5 + 8;
+
+  // Divider
+  doc.line(margin, y, 210 - margin, y);
+  y += 4;
+
+  // Items table
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [["Product", "Qty", "Unit price", "Total"]],
+    body: order.order_items.map((it) => [
+      it.name + (it.size ? ` (${it.size})` : "") + (it.color ? ` · ${it.color}` : ""),
+      String(it.quantity),
+      formatMoney(Number(it.price)),
+      formatMoney(Number(it.price) * it.quantity),
+    ]),
+    headStyles: { fillColor: [30, 30, 30], textColor: 255, fontSize: 8 },
+    bodyStyles: { fontSize: 9 },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { cellWidth: 18, halign: "center" },
+      2: { cellWidth: 30, halign: "right" },
+      3: { cellWidth: 30, halign: "right" },
+    },
+  });
+
+  // Price summary — bottom right
+  const afterTable = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  const summaryX = 130;
+  let sy = afterTable;
+
+  const rows: [string, string][] = [
+    ["Subtotal", formatMoney(order.subtotal)],
+    ["Shipping", order.shipping === 0 ? "Free" : formatMoney(order.shipping)],
+    ["Tax", formatMoney(order.tax)],
+  ];
+  if (order.discount > 0) rows.push(["Discount", `−${formatMoney(order.discount)}`]);
+
+  doc.setFontSize(9);
+  rows.forEach(([label, val]) => {
+    doc.setFont("helvetica", "normal");
+    doc.text(label, summaryX, sy);
+    doc.text(val, 210 - margin, sy, { align: "right" });
+    sy += 6;
+  });
+
+  // Total line
+  doc.setDrawColor(180, 180, 180);
+  doc.line(summaryX, sy - 2, 210 - margin, sy - 2);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("TOTAL", summaryX, sy + 4);
+  doc.text(formatMoney(order.total), 210 - margin, sy + 4, { align: "right" });
+
+  // Footer
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text("Thank you for your order!", 105, 285, { align: "center" });
+
+  doc.save(`${order.order_number}.pdf`);
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 function Badge({
   label,
@@ -101,6 +230,18 @@ function OrderDetail({
   return (
     <div className="border-b border-border bg-secondary/20">
       <div className="p-4 sm:p-6 space-y-5">
+        {/* Download PDF button */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); downloadOrderPDF(order); }}
+            className="inline-flex items-center gap-1.5 rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-secondary transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download PDF
+          </button>
+        </div>
+
         {/* Status toggle — full width */}
         <div className="flex items-center justify-between rounded border border-border bg-background px-4 py-3">
           <div>
