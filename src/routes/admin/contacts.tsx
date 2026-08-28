@@ -27,16 +27,18 @@ function AdminContactsPage() {
     queryKey: ["admin_contact_messages"],
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const result = await (supabase as any)
         .from("contact_messages")
         .select("*")
         .order("created_at", { ascending: false });
 
+      const error: { code?: string; message?: string } | null = result.error;
       if (error) {
-        if (error.code === "42P01") return [];
+        if (error.code === "42P01") return [] as ContactMessage[];
         throw error;
       }
-      return (data ?? []) as unknown as ContactMessage[];
+      const data: unknown = result.data;
+      return (data as ContactMessage[] | null) ?? [];
     },
   });
 
