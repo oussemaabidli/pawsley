@@ -114,10 +114,19 @@ function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  return (
+  return sent ? (
+    <div className="mt-6 rounded-sm border border-border bg-muted/40 p-6 text-center space-y-2">
+      <p className="text-2xl">📬</p>
+      <p className="font-medium">Check your email!</p>
+      <p className="text-sm text-muted-foreground">
+        We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
+        Click it to activate your account.
+      </p>
+    </div>
+  ) : (
     <form
       className="mt-4 space-y-3"
       onSubmit={async (e) => {
@@ -127,7 +136,7 @@ function SignUp() {
           email,
           password,
           options: {
-            data: { full_name: name, phone },
+            data: { full_name: name },
             emailRedirectTo: window.location.origin,
           },
         });
@@ -141,18 +150,13 @@ function SignUp() {
           ) {
             toast.error(
               "This email is already registered. Please sign in instead.",
-              {
-                description:
-                  "If you don't see this error, disable 'Email Enumeration Protection' in your Supabase Auth settings.",
-                duration: 8000,
-              },
+              { duration: 6000 },
             );
           } else {
             toast.error(error.message);
           }
         } else {
-          // If enumeration protection is ON, Supabase returns a fake user (identities is usually empty for fake users).
-          // We can check if identities is empty to detect a silent failure.
+          // If identities is empty, email enumeration protection returned a fake success
           if (
             data?.user &&
             data.user.identities &&
@@ -162,7 +166,11 @@ function SignUp() {
               "This email is already registered. Please sign in instead.",
             );
           } else {
-            toast.success("Account created — you're signed in");
+            // Show the "check your email" panel
+            setSent(true);
+            toast.success("Confirmation email sent! Please check your inbox.", {
+              duration: 8000,
+            });
           }
         }
       }}
@@ -176,25 +184,6 @@ function SignUp() {
           placeholder="Ahmed Ben Ali"
           required
         />
-      </div>
-      <div>
-        <Label htmlFor="signup-phone">Phone number</Label>
-        <div className="relative">
-          <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground select-none pointer-events-none">
-            +216
-          </span>
-          <Input
-            id="signup-phone"
-            type="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="XX XXX XXX"
-            className="pl-14"
-            pattern="[0-9]{8}"
-            title="Enter your 8-digit Tunisian phone number"
-          />
-        </div>
       </div>
       <div>
         <Label htmlFor="signup-email">Email</Label>
