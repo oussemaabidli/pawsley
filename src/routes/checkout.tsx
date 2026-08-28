@@ -22,7 +22,7 @@ function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
-    email: user?.email ?? "",
+    email: "",
     phone: "",
     line1: "",
     line2: "",
