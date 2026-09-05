@@ -58,6 +58,44 @@ export const Route = createFileRoute("/shop")({
       raw.in_stock === true || raw.in_stock === "true" ? true : undefined,
     page: raw.page ? Number(raw.page) : 1,
   }),
+  // Prefetch categories and the first page of products on navigation/hover
+  // so the shop renders with data ready, not a blank skeleton.
+  loader: async ({ context: { queryClient } }) => {
+    await Promise.all([
+      queryClient.prefetchQuery({
+        queryKey: ["categories_all"],
+        staleTime: 10 * 60_000,
+        queryFn: async () => {
+          const { data } = await supabase
+            .from("categories")
+            .select("id,slug,name")
+            .eq("visible", true)
+            .order("sort_order");
+          return data ?? [];
+        },
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ["shop_products", { page: 1 }],
+        staleTime: 30_000,
+        queryFn: async () => {
+          const { data, count } = await supabase
+            .from("products")
+            .select(
+              "id,slug,name,price,compare_at_price,pet_type,category_id,product_images(url,sort_order)",
+              { count: "exact" },
+            )
+            .eq("visible", true)
+            .eq("archived", false)
+            .order("created_at", { ascending: false })
+            .range(0, PAGE_SIZE - 1);
+          return {
+            items: (data ?? []) as unknown as ProductCardProduct[],
+            count: count ?? 0,
+          };
+        },
+      }),
+    ]);
+  },
   component: ShopPage,
 });
 

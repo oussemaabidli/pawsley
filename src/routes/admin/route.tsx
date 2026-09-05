@@ -54,10 +54,10 @@ const nav = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ] as const;
 
-function AdminLayout() {
-  const [open, setOpen] = useState(false);
-
-  const Sidebar = () => (
+// Hoisted to module level so React sees a stable component identity across
+// re-renders of AdminLayout — prevents unnecessary unmount/remount of the nav.
+function AdminSidebar({ onLinkClick }: { onLinkClick: () => void }) {
+  return (
     <nav className="flex flex-col gap-0.5 px-3 mt-2">
       {nav.map((n) => {
         const Icon = n.icon;
@@ -70,7 +70,7 @@ function AdminLayout() {
               className: "bg-sidebar-accent text-sidebar-accent-foreground",
             }}
             className="flex items-center gap-3 rounded px-3 py-2 text-sm hover:bg-sidebar-accent transition-colors"
-            onClick={() => setOpen(false)}
+            onClick={onLinkClick}
           >
             <Icon className="h-4 w-4 shrink-0 opacity-70" />
             {n.label}
@@ -80,12 +80,17 @@ function AdminLayout() {
       <Link
         to="/"
         className="mt-4 flex items-center gap-3 rounded px-3 py-2 text-xs text-sidebar-foreground/60 hover:bg-sidebar-accent transition-colors"
-        onClick={() => setOpen(false)}
+        onClick={onLinkClick}
       >
         ← Back to store
       </Link>
     </nav>
   );
+}
+
+function AdminLayout() {
+  const [open, setOpen] = useState(false);
+  const closeMenu = () => setOpen(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,7 +109,7 @@ function AdminLayout() {
       {/* ── Mobile slide-down nav ── */}
       {open && (
         <div className="border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden">
-          <Sidebar />
+          <AdminSidebar onLinkClick={closeMenu} />
           <div className="h-3" />
         </div>
       )}
@@ -114,7 +119,7 @@ function AdminLayout() {
         {/* Desktop sidebar */}
         <aside className="hidden md:block border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
           <div className="p-6 font-display text-xl">Pawsley Admin</div>
-          <Sidebar />
+          <AdminSidebar onLinkClick={closeMenu} />
         </aside>
 
         {/* Main content */}

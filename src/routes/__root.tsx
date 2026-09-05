@@ -126,9 +126,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           href: "https://fonts.gstatic.com",
           crossOrigin: "anonymous",
         },
+        // Preload the font CSS so it's fetched in parallel without blocking render.
+        // The onload handler swaps rel to "stylesheet" once the CSS is ready.
         {
-          rel: "stylesheet",
+          rel: "preload",
           href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap",
+          as: "style",
+          // @ts-expect-error — onload is valid on link elements but not in TS types
+          onload: "this.onload=null;this.rel='stylesheet'",
         },
       ],
     }),

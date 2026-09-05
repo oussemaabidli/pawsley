@@ -11,7 +11,86 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
+// ─── Query factories — shared between loader and useQuery ────────────────────
+// Defined at module level so they can be reused in both the route loader
+// (prefetching on navigation/hover) and the component (useQuery), no duplication.
+
+const HOME_STALE = 5 * 60_000; // 5 min — homepage data changes infrequently
+
+const sectionsQuery = () => ({
+  queryKey: ["homepage_sections"],
+  staleTime: HOME_STALE,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("homepage_sections")
+      .select("id,key,type,title,subtitle,cta_label,cta_link,image_url,sort_order")
+      .eq("visible", true)
+      .order("sort_order");
+    if (error) throw error;
+    return (data ?? []) as Section[];
+  },
+});
+
+const categoriesQuery = () => ({
+  queryKey: ["home_featured_categories"],
+  staleTime: HOME_STALE,
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("categories")
+      .select("id,slug,name,image_url")
+      .eq("visible", true)
+      .order("sort_order")
+      .limit(6);
+    return data ?? [];
+  },
+});
+
+// ONE consolidated product query replacing the previous 3 separate calls.
+// Fetches all homepage products in a single round-trip; sliced client-side.
+const homeProductsQuery = () => ({
+  queryKey: ["home_all_products"],
+  staleTime: HOME_STALE,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "id,slug,name,price,compare_at_price,featured,sales_count,created_at,product_images(url,sort_order)",
+      )
+      .eq("visible", true)
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(24);
+    if (error) throw error;
+    return (data ?? []) as unknown as HomeProduct[];
+  },
+});
+
+const reviewsQuery = () => ({
+  queryKey: ["home_reviews"],
+  staleTime: HOME_STALE,
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("reviews")
+      .select("id,rating,comment,created_at,product:products(name)")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(3);
+    return data ?? [];
+  },
+});
+
 export const Route = createFileRoute("/")({
+  // Prefetch all homepage data during navigation. Because router.tsx has
+  // defaultPreload:"intent", this fires when the user hovers the home link —
+  // so data is already cached by the time they click.
+  loader: async ({ context: { queryClient } }) => {
+    await Promise.all([
+      queryClient.prefetchQuery(sectionsQuery()),
+      queryClient.prefetchQuery(categoriesQuery()),
+      queryClient.prefetchQuery(homeProductsQuery()),
+      queryClient.prefetchQuery(reviewsQuery()),
+    ]);
+  },
   component: HomePage,
 });
 
@@ -27,49 +106,18 @@ type Section = {
   sort_order: number;
 };
 
-function HomePage() {
-  const sections = useQuery({
-    queryKey: ["homepage_sections"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("homepage_sections")
-        .select(
-          "id,key,type,title,subtitle,cta_label,cta_link,image_url,sort_order",
-        )
-        .eq("visible", true)
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as Section[];
-    },
-  });
+type HomeProduct = ProductCardProduct & {
+  featured: boolean;
+  sales_count: number;
+  created_at: string;
+};
 
-  const featuredCats = useQuery({
-    queryKey: ["home_featured_categories"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("categories")
-        .select("id,slug,name,image_url")
-        .eq("visible", true)
-        .order("sort_order")
-        .limit(6);
-      return data ?? [];
-    },
-  });
-  const featured = useProductBlock({ featured: true, limit: 8 });
-  const best = useProductBlock({ orderBy: "sales_count", limit: 4 });
-  const fresh = useProductBlock({ orderBy: "created_at", limit: 4 });
-  const reviews = useQuery({
-    queryKey: ["home_reviews"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("reviews")
-        .select("id,rating,comment,created_at,product:products(name)")
-        .eq("status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      return data ?? [];
-    },
-  });
+function HomePage() {
+  // All queries are served from cache populated by the route loader.
+  const sections = useQuery(sectionsQuery());
+  const featuredCats = useQuery(categoriesQuery());
+  const allProducts = useQuery(homeProductsQuery());
+  const reviews = useQuery(reviewsQuery());
 
   const bySection = useMemo(
     () =>
@@ -78,6 +126,18 @@ function HomePage() {
       ),
     [sections.data],
   );
+
+  // Derive 3 homepage sections from the single pooled product query client-side.
+  const products = allProducts.data ?? [];
+  const featured = useMemo(
+    () => products.filter((p) => p.featured).slice(0, 8),
+    [products],
+  );
+  const best = useMemo(
+    () => [...products].sort((a, b) => b.sales_count - a.sales_count).slice(0, 4),
+    [products],
+  );
+  const fresh = useMemo(() => products.slice(0, 4), [products]);
 
   return (
     <SiteShell>
@@ -165,7 +225,7 @@ function HomePage() {
       {bySection.featured_products && (
         <section className="container-luxe py-12 sm:py-20">
           <SectionHeading section={bySection.featured_products} />
-          <ProductGrid products={featured.data ?? []} />
+          <ProductGrid products={featured} />
         </section>
       )}
 
@@ -198,17 +258,17 @@ function HomePage() {
         </section>
       )}
 
-      {bySection.best_sellers && (best.data?.length ?? 0) > 0 && (
+      {bySection.best_sellers && (best?.length ?? 0) > 0 && (
         <section className="container-luxe py-12 sm:py-20">
           <SectionHeading section={bySection.best_sellers} />
-          <ProductGrid products={best.data ?? []} />
+          <ProductGrid products={best} />
         </section>
       )}
 
-      {bySection.new_arrivals && (fresh.data?.length ?? 0) > 0 && (
+      {bySection.new_arrivals && (fresh?.length ?? 0) > 0 && (
         <section className="container-luxe py-12 sm:py-20">
           <SectionHeading section={bySection.new_arrivals} />
-          <ProductGrid products={fresh.data ?? []} />
+          <ProductGrid products={fresh} />
         </section>
       )}
 
@@ -310,28 +370,4 @@ function ProductGrid({ products }: { products: ProductCardProduct[] }) {
   );
 }
 
-function useProductBlock(opts: {
-  featured?: boolean;
-  orderBy?: "sales_count" | "created_at";
-  limit: number;
-}) {
-  return useQuery({
-    queryKey: ["home_products", opts],
-    queryFn: async () => {
-      let q = supabase
-        .from("products")
-        .select(
-          "id,slug,name,price,compare_at_price,product_images(url,sort_order)",
-        )
-        .eq("visible", true)
-        .eq("archived", false);
-      if (opts.featured) q = q.eq("featured", true);
-      q = q
-        .order(opts.orderBy ?? "created_at", { ascending: false })
-        .limit(opts.limit);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []) as unknown as ProductCardProduct[];
-    },
-  });
-}
+
