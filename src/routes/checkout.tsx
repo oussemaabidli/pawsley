@@ -226,9 +226,7 @@ function CheckoutPage() {
                   <RadioGroupItem value="standard" /> Standard — 3–5 business
                   days
                 </label>
-                <label className="flex items-center gap-3 rounded border border-border p-3">
-                  <RadioGroupItem value="express" /> Express — 1–2 business days
-                </label>
+
               </RadioGroup>
             </section>
 
