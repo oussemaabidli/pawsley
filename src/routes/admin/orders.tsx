@@ -34,6 +34,7 @@ type ShippingAddress = {
 
 type OrderItem = {
   id: string;
+  product_id: string | null;
   name: string;
   image_url: string | null;
   quantity: number;
@@ -221,7 +222,7 @@ function OrderDetail({
   toggling,
 }: {
   order: Order;
-  onToggle: (id: string, next: string) => void;
+  onToggle: (id: string, next: string, items: OrderItem[]) => void;
   toggling: boolean;
 }) {
   const addr = order.shipping_address;
@@ -255,7 +256,7 @@ function OrderDetail({
             disabled={toggling}
             onClick={(e) => {
               e.stopPropagation();
-              onToggle(order.id, isConfirmed ? "pending" : "accepted");
+              onToggle(order.id, isConfirmed ? "pending" : "accepted", order.order_items);
             }}
             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
               isConfirmed ? "bg-emerald-500" : "bg-muted-foreground/30"
@@ -403,7 +404,7 @@ function OrderRow({
   toggling,
 }: {
   order: Order;
-  onToggle: (id: string, next: string) => void;
+  onToggle: (id: string, next: string, items: OrderItem[]) => void;
   toggling: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -460,7 +461,16 @@ function AdminOrders() {
   });
 
   const toggle = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({
+      id,
+      status,
+      items,
+    }: {
+      id: string;
+      status: string;
+      items: OrderItem[];
+    }) => {
+      // 1. Update the order status
       const { error } = await supabase
         .from("orders")
         .update({
@@ -476,13 +486,41 @@ function AdminOrders() {
         })
         .eq("id", id);
       if (error) throw error;
+
+      // 2. Adjust product stock for items that have a product_id
+      const stockItems = items.filter((it) => it.product_id);
+      if (stockItems.length === 0) return;
+
+      // Fetch current stock for all affected products
+      const productIds = stockItems.map((it) => it.product_id as string);
+      const { data: products, error: fetchErr } = await supabase
+        .from("products")
+        .select("id, stock")
+        .in("id", productIds);
+      if (fetchErr) throw fetchErr;
+
+      // Update each product's stock
+      await Promise.all(
+        (products ?? []).map((product) => {
+          const item = stockItems.find((it) => it.product_id === product.id);
+          if (!item) return Promise.resolve();
+          // Decrement on accept, restore on revert to pending
+          const delta = status === "accepted" ? -item.quantity : item.quantity;
+          const newStock = Math.max(0, (product.stock ?? 0) + delta);
+          return supabase
+            .from("products")
+            .update({ stock: newStock })
+            .eq("id", product.id);
+        }),
+      );
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["admin_orders"] });
+      qc.invalidateQueries({ queryKey: ["admin_products"] });
       toast.success(
         vars.status === "accepted"
-          ? "Order accepted ✓"
-          : "Order set back to pending",
+          ? "Order accepted — stock updated ✓"
+          : "Order reverted to pending — stock restored",
       );
     },
     onError: (e: Error) => toast.error(e.message),
@@ -515,7 +553,7 @@ function AdminOrders() {
                 <OrderRow
                   key={o.id}
                   order={o as unknown as Order}
-                  onToggle={(id, next) => toggle.mutate({ id, status: next })}
+                  onToggle={(id, next, items) => toggle.mutate({ id, status: next, items })}
                   toggling={toggle.isPending}
                 />
               ))}
